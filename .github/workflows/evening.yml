@@ -1,0 +1,76 @@
+﻿name: 晚间复盘
+
+# 提前 4 小时启动（北京时间 16:00），sleep 到 20:00 再发，吸收 GitHub 的调度延迟。
+on:
+  schedule:
+    - cron: "0 8 * * *"     # 北京时间 16:00 启动
+    - cron: "30 10 * * *"   # 18:30 兜底
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vocabcurve-evening
+  cancel-in-progress: false
+
+jobs:
+  evening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 等到 20:00
+        run: |
+          TARGET=$(TZ=Asia/Shanghai date +%s -d "today 20:00")
+          NOW=$(date +%s)
+          WAIT=$((TARGET - NOW))
+          if [ "$WAIT" -gt 0 ]; then
+            echo "sleep ${WAIT}s"
+            sleep "$WAIT"
+          fi
+
+      - name: 时间窗（19:00-22:00 之外就不发）
+        id: window
+        run: |
+          H=$(TZ=Asia/Shanghai date +%H); H=$((10#$H))
+          if [ "$H" -lt 19 ] || [ "$H" -ge 22 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 今天发过没
+        if: steps.window.outputs.skip == 'false'
+        id: check
+        run: |
+          TODAY=$(TZ=Asia/Shanghai date +%F)
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+          if [ -f state/last-report.txt ] && [ "$(cat state/last-report.txt)" = "$TODAY" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 发复盘
+        if: steps.window.outputs.skip == 'false' && steps.check.outputs.skip == 'false'
+        env:
+          PUSH_URL: ${{ secrets.VOCAB_PUSH_URL }}
+        run: |
+          python -m vocabcurve report --push --url "$PUSH_URL"
+          mkdir -p state && echo "${{ steps.check.outputs.today }}" > state/last-report.txt
+
+      - name: 记录
+        if: steps.window.outputs.skip == 'false' && steps.check.outputs.skip == 'false'
+        run: |
+          git config user.name "vocabcurve-bot"
+          git config user.email "vocabcurve@local"
+          git add state/last-report.txt
+          git commit -m "chore: 复盘已发 $(cat state/last-report.txt)" || exit 0
+          git pull --rebase origin "${GITHUB_REF_NAME}" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}"

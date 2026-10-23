@@ -1,0 +1,31 @@
+第1篇 校园与学习
+abandon  v. 放弃；抛弃
+academic  adj. 学术的；学院的
+assume  v. 假定；承担
+assign  v. 分配；指派
+attendance  n. 出勤；出席
+curriculum  n. 课程体系
+deadline  n. 截止日期
+dormitory  n. 宿舍
+lecture  n. 讲座；课
+scholarship  n. 奖学金
+
+第2篇 科技与环境
+algorithm  n. 算法
+artificial  adj. 人造的；人工的
+carbon  n. 碳
+climate  n. 气候
+emission  n. 排放
+efficient  adj. 高效的
+renewable  adj. 可再生的
+sustainable  adj. 可持续的
+
+第3篇 经济与生活
+budget  n. 预算
+consume  v. 消耗；消费
+inflation  n. 通货膨胀
+investment  n. 投资
+purchase  v. 购买
+revenue  n. 收入；税收
+subsidy  n. 补贴
+transaction  n. 交易
