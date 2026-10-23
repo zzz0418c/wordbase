@@ -1,0 +1,59 @@
+﻿{
+    "loggedIn": true,
+    "authType": "OAuth Token",
+    "email": "2606283601@qq.com",
+    "accounts": [
+        {
+            "id": "93e62381deded528f64d2de8fe312cc4",
+            "name": "2606283601@qq.com's Account",
+            "type": "standard",
+            "settings": {
+                "enforce_twofactor": false,
+                "api_access_enabled": null,
+                "access_approval_expiry": null,
+                "abuse_contact_email": null,
+                "oauth_app_access_enabled": true
+            },
+            "legacy_flags": {
+                "enterprise_zone_quota": {
+                    "maximum": 0,
+                    "current": 0,
+                    "available": 0
+                }
+            },
+            "created_on": "2026-10-23T06:45:24.148998Z"
+        }
+    ],
+    "tokenPermissions": [
+        "user:read",
+        "offline_access",
+        "k2.read",
+        "k2.write",
+        "account:read",
+        "workers:write",
+        "workers_kv:write",
+        "workers_routes:write",
+        "workers_scripts:write",
+        "workers_tail:read",
+        "d1:write",
+        "pages:write",
+        "zone:read",
+        "ssl_certs:write",
+        "ai:write",
+        "ai-search:write",
+        "ai-search:run",
+        "agent-memory:write",
+        "queues:write",
+        "pipelines:write",
+        "secrets_store:write",
+        "artifacts:write",
+        "flagship:write",
+        "containers:write",
+        "cloudchamber:write",
+        "connectivity:admin",
+        "email_routing:write",
+        "email_sending:write",
+        "browser:write",
+        "challenge-widgets.write"
+    ]
+}
