@@ -2,8 +2,9 @@
 main = "worker.js"
 compatibility_date = "2026-01-01"
 
-# Cloudflare cron 用 UTC：
-#   23:25 UTC = 北京时间 07:25（早上）
-#   12:00 UTC = 北京时间 20:00（晚上）
 [triggers]
 crons = ["25 23 * * *", "0 12 * * *"]
+
+[[kv_namespaces]]
+binding = "LOG"
+id = "e81dc40200d847329262a8f501b3c34b"

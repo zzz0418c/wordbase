@@ -128,12 +128,23 @@ async function push(env, text) {
 
 export default {
   async scheduled(event, env, ctx) {
-    const book = await loadBook();
-    const today = todayCST();
+    const started = new Date().toISOString();
     const evening = event.cron === "0 12 * * *";
-    const text = evening ? eveningText(book, today) : morningText(book, today);
-    const result = await push(env, text);
-    console.log(`[${event.cron}]`, text, result);
+    let record = { started, cron: event.cron, evening };
+    try {
+      const book = await loadBook();
+      const today = todayCST();
+      const text = evening ? eveningText(book, today) : morningText(book, today);
+      const result = await push(env, text);
+      record = { ...record, ok: true, text, result };
+      console.log(`[${event.cron}]`, text, result);
+    } catch (error) {
+      record = { ...record, ok: false, error: String(error && error.stack ? error.stack : error) };
+      console.log("FAILED", record.error);
+    }
+    if (env.LOG) {
+      try { await env.LOG.put("last_run", JSON.stringify(record)); } catch (e) { /* ignore */ }
+    }
   },
 
   async fetch(request, env) {
