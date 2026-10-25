@@ -15,7 +15,7 @@ import re
 import shutil
 import sqlite3
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .model import Word, WordList
@@ -23,6 +23,7 @@ from .parse import parse_entry
 
 DB_NAME = "NoteSync.db"
 _TAG_RE = re.compile(r"<[^>]+>")
+_PAGES_RE = re.compile(r'<vnote-hdw[^>]*>(.*?)</vnote-hdw>', re.S)
 _PAGE_RE = re.compile(r'<vnote-hdw[^>]*page="1"[^>]*>(.*?)</vnote-hdw>', re.S)
 
 
@@ -49,6 +50,7 @@ class VivoNote:
     kind: int
     text: str
     first_page: str = ""
+    pages: list[str] = field(default_factory=list)
 
     @property
     def is_image(self) -> bool:
@@ -97,6 +99,7 @@ def load_notes(db: Path | None = None) -> list[VivoNote]:
                     kind=int(row["type"] or 0),
                     text=text,
                     first_page=first_page,
+                    pages=[page.strip() for page in _PAGES_RE.findall(raw)],
                 )
             )
         return notes

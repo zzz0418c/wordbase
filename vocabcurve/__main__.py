@@ -997,6 +997,68 @@ def cmd_notify(args) -> int:
     return 0
 
 
+
+
+def cmd_sync_dates(args) -> int:
+    """扫每篇笔记的所有页，把「下次 10.27」写进 schedule.csv。"""
+    from .nextdate import explicit_next
+
+    book = _load(args)
+    now = _now(args, book)
+    today = now.date()
+    notes = load_notes(Path(args.db) if args.db else None)
+    by_title = {note.title.strip(): note for note in notes if note.title}
+
+    csv_path = Path(args.csv)
+    existing: dict[str, str] = {}
+    if csv_path.exists():
+        for line in csv_path.read_text(encoding="utf-8").splitlines():
+            parts = line.split(",")
+            if len(parts) >= 2 and parts[0].strip() and parts[0].strip() != "title":
+                existing[parts[0].strip()] = parts[1].strip()
+
+    found: dict[str, str] = {}
+    for item in book.lists:
+        note = by_title.get(item.title.strip())
+        if note is None:
+            continue
+        for page in note.pages:
+            value = explicit_next(page, today)
+            if value:
+                found[item.title.strip()] = value.isoformat()
+                break
+
+    merged = dict(existing)
+    merged.update(found)
+
+    lines = ["title,next_date"]
+    for item in book.lists:
+        key = item.title.strip()
+        if key in merged:
+            lines.append(f"{key},{merged[key]}")
+    csv_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    if args.push:
+        import subprocess
+        repo = Path(__file__).resolve().parents[1]
+        env = dict(os.environ); env.update({"GIT_TERMINAL_PROMPT":"0","GCM_INTERACTIVE":"never"})
+        for cmd in (["git","add","schedule.csv"],
+                    ["git","commit","-m",f"chore: 笔记里的下次日期 {now:%m-%d %H:%M}"],
+                    ["git","-c","http.sslVerify=false","push","origin","HEAD:main"]):
+            r = subprocess.run(cmd, cwd=str(repo), capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=90)
+            if r.returncode != 0 and "nothing to commit" not in (r.stdout+r.stderr):
+                print("  ! 推送失败：", r.stderr.strip()[:100]); break
+        else:
+            print("✓ 已推送到 GitHub")
+
+    print(f"✓ 从笔记里读到 {len(found)} 篇的「下次」日期，写进 {csv_path}")
+    for item in book.lists:
+        key = item.title.strip()
+        mark = "← 笔记" if key in found else ""
+        print(f"  {key}: {merged.get(key, '—')} {mark}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="vocabcurve",
@@ -1073,6 +1135,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--url", help="企业微信 webhook（默认读 WECOM_WEBHOOK）")
     p.add_argument("--at")
     p.set_defaults(func=cmd_report)
+
+    p = subs.add_parser("sync-dates", help="从笔记里读「下次 10.27」写入 schedule.csv")
+    p.add_argument("--csv", default="schedule.csv")
+    p.add_argument("--push", action="store_true", help="写完顺手推 GitHub")
+    p.add_argument("--db")
+    p.add_argument("--at")
+    p.set_defaults(func=cmd_sync_dates)
 
     p = subs.add_parser("sync-vivo", help="读今天的原子笔记，自动勾掉今天已复习的篇目")
     p.add_argument("--push", action="store_true", help="改完顺手 git push 到 GitHub")
