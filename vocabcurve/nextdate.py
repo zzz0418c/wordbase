@@ -1,66 +1,92 @@
-"""从笔记里读出「下次 X」这种明确写下的日期。
+"""从笔记的「日期页」里读出下次复习日。
 
-你的做法：每篇笔记加一页专门写日期，最后一行写「下次 10.27」。
-OCR 会把 10.27 认成 1027、把 11.1 认成 111，所以这里做宽松解析。
+你的日期页是手写拍照的，OCR 会把 `10.27` 认成 `1027`、把两个日期黏成 `10.1910.22`。
+所以这里不做正则硬匹配，而是逐字符扫描 `数字 + 分隔符 + 数字`，允许重叠，
+再把所有候选日期取最大值 —— 日期页上的日期是从早到晚写的，最后一个就是「下次」。
 """
 
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date
 
-_MARK = re.compile(r"下\s*次?|下\s*一\s*次")
+_MARK = re.compile(r"下\s*次|下\s*一\s*次")
+_SEP = ".。,，、:：-"
 
 
-def _loose_date(raw: str, today: date) -> date | None:
-    digits = re.sub(r"\D", "", raw)
-    if len(digits) < 3:
+def scan_dates(text: str, today: date) -> list[date]:
+    """逐位置扫描，抓出所有像日期的东西（前后 120 天内）。"""
+    found: set[date] = set()
+    length = len(text)
+    for i in range(length):
+        if not (text[i].isascii() and text[i].isdigit()):
+            continue
+        for width in (1, 2):
+            if i + width > length:
+                continue
+            head = text[i:i + width]
+            if not (head.isascii() and head.isdigit()):
+                continue
+            pos = i + width
+            if pos < length and text[pos] in _SEP:
+                pos += 1
+                for d_width in (1, 2):
+                    tail = text[pos:pos + d_width]
+                    if len(tail) == d_width and tail.isascii() and tail.isdigit():
+                        month, day = int(head), int(tail)
+                        if 1 <= month <= 12 and 1 <= day <= 31:
+                            try:
+                                value = date(today.year, month, day)
+                            except ValueError:
+                                continue
+                            if abs((value - today).days) <= 120:
+                                found.add(value)
+    return sorted(found)
+
+
+def _loose_next_after_mark(text: str, today: date) -> date | None:
+    matches = list(_MARK.finditer(text))
+    if not matches:
         return None
-    digits = digits[:4]
+    match = matches[-1]
+    tail = text[match.end(): match.end() + 18]
+    dates = scan_dates(tail, today)
+    if dates:
+        return dates[-1]
 
-    candidates: list[tuple[int, int]] = []
-    if len(digits) == 4:
-        candidates.append((int(digits[:2]), int(digits[2:])))
-    elif len(digits) == 3:
-        candidates.append((int(digits[:2]), int(digits[2:])))
-        candidates.append((int(digits[0]), int(digits[1:])))
-
-    for month, day in candidates:
+    # OCR 会把 "11.1" 认成 "111"，没有分隔符，这里兜一次底
+    digits = re.sub(r"\D", "", tail)[:4]
+    if len(digits) in (3, 4):
+        month, day = int(digits[:2]), int(digits[2:])
         if not (1 <= month <= 12 and 1 <= day <= 31):
-            continue
-        try:
-            value = date(today.year, month, day)
-        except ValueError:
-            continue
-        if value < today - timedelta(days=90):
-            value = date(today.year + 1, month, day)
-        return value
+            month, day = int(digits[0]), int(digits[1:])
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            try:
+                return date(today.year, month, day)
+            except ValueError:
+                return None
     return None
 
 
-def explicit_next(text: str, today: date) -> date | None:
-    """找到「下次」后面的日期；找不到返回 None。"""
-    match = _MARK.search(text)
-    if not match:
-        return None
-    tail = text[match.end(): match.end() + 16]
-    return _loose_date(tail, today)
-
-
-_DATE_OK = re.compile(r"(?<!\d)(\d{1,2})\s*[.。、,:：\-]\s*(\d{1,2})(?!\d)")
-
-
-def all_dates(text: str, today: date) -> list[date]:
-    """把一段文字里所有合理日期都抠出来（前后 120 天以内）。"""
-    out: list[date] = []
-    for match in _DATE_OK.finditer(text):
-        month, day = int(match.group(1)), int(match.group(2))
-        if not (1 <= month <= 12 and 1 <= day <= 31):
+def best_page_next(pages: list[str], today: date) -> tuple[date | None, int, str]:
+    """在笔记的所有页里挑最像「日期页」的那一页，返回 (下次日期, 页号, 依据)。"""
+    best: tuple[int, int, str, list[date]] | None = None
+    for index, page in enumerate(pages):
+        dates = scan_dates(page, today)
+        if len(dates) < 2:
             continue
-        try:
-            value = date(today.year, month, day)
-        except ValueError:
+        # 日期页一定是短页；长页是单词正文，里面的数字只是噪声
+        if len(page) > 120:
             continue
-        if abs((value - today).days) <= 120:
-            out.append(value)
-    return sorted(set(out))
+        score = len(dates) * 3 - (len(page) // 40)
+        if best is None or score > best[0]:
+            best = (score, index, page, dates)
+
+    if best is None:
+        return None, -1, ""
+
+    _, index, page, dates = best
+    explicit = _loose_next_after_mark(page, today)
+    if explicit:
+        return explicit, index, f"下次标记 {explicit:%m-%d}"
+    return dates[-1], index, f"页内最大日期 {dates[-1]:%m-%d}"

@@ -1001,7 +1001,7 @@ def cmd_notify(args) -> int:
 
 def cmd_sync_dates(args) -> int:
     """扫每篇笔记的所有页，把「下次 10.27」写进 schedule.csv。"""
-    from .nextdate import explicit_next
+    from .nextdate import best_page_next
 
     book = _load(args)
     now = _now(args, book)
@@ -1018,15 +1018,15 @@ def cmd_sync_dates(args) -> int:
                 existing[parts[0].strip()] = parts[1].strip()
 
     found: dict[str, str] = {}
+    sources: dict[str, str] = {}
     for item in book.lists:
         note = by_title.get(item.title.strip())
         if note is None:
             continue
-        for page in note.pages:
-            value = explicit_next(page, today)
-            if value:
-                found[item.title.strip()] = value.isoformat()
-                break
+        value, page_index, why = best_page_next(note.pages, today)
+        if value:
+            found[item.title.strip()] = value.isoformat()
+            sources[item.title.strip()] = f"p{page_index} {why}"
 
     merged = dict(existing)
     merged.update(found)
@@ -1054,7 +1054,7 @@ def cmd_sync_dates(args) -> int:
     print(f"✓ 从笔记里读到 {len(found)} 篇的「下次」日期，写进 {csv_path}")
     for item in book.lists:
         key = item.title.strip()
-        mark = "← 笔记" if key in found else ""
+        mark = f"← {sources[key]}" if key in sources else ""
         print(f"  {key}: {merged.get(key, '—')} {mark}")
     return 0
 
