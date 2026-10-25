@@ -90,3 +90,17 @@ def best_page_next(pages: list[str], today: date) -> tuple[date | None, int, str
     if explicit:
         return explicit, index, f"下次标记 {explicit:%m-%d}"
     return dates[-1], index, f"页内最大日期 {dates[-1]:%m-%d}"
+
+
+def parse_loose(raw: str, today: date) -> date | None:
+    """把「1027」「111」这种粘连数字解析成日期。"""
+    digits = re.sub(r"\D", "", raw)[:4]
+    if len(digits) not in (3, 4):
+        return None
+    for month, day in ((int(digits[:2]), int(digits[2:])), (int(digits[0]), int(digits[1:]))):
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            try:
+                return date(today.year, month, day)
+            except ValueError:
+                continue
+    return None
