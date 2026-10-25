@@ -121,8 +121,19 @@ def guess(text: str, today: date, offsets: list[int] | None = None) -> Guess:
     return result
 
 
+_NEXT_RE = re.compile(r"下次\s*[:：]?\s*(\d{1,2})\s*[.\-月/]\s*(\d{1,2})")
+
+
 def find_next_date(text: str, today: date) -> date | None:
-    """最大圈号下面那个「没圈号的日期」= 手写的下次复习时间。"""
+    """优先认「下次 10.27」这种显式写法，没有就退回"最后一个没圈号的日期"。"""
+    for match in _NEXT_RE.finditer(text):
+        month, day = int(match.group(1)), int(match.group(2))
+        try:
+            value = date(today.year, month, day)
+        except ValueError:
+            continue
+        return value
+
     marks: list[tuple[date, bool]] = []
     for match in _DATE_RE.finditer(text):
         month, day = int(match.group(1)), int(match.group(2))
