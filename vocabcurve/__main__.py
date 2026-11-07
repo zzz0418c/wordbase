@@ -1039,6 +1039,7 @@ def cmd_sync_dates(args) -> int:
     csv_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     if args.push:
+        import os
         import subprocess
         repo = Path(__file__).resolve().parents[1]
         env = dict(os.environ); env.update({"GIT_TERMINAL_PROMPT":"0","GCM_INTERACTIVE":"never"})
